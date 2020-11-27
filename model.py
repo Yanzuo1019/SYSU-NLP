@@ -29,8 +29,8 @@ class BiLSTM_CRF(nn.Module):
 
         self.emission = nn.Linear(hidden_dim, self.target_size)
         self.transition = nn.Parameter(torch.randn(self.target_size, self.target_size))
-        self.transition.data[tag2id[START_TAG], :] = -np.inf
-        self.transition.data[:, tag2id[STOP_TAG]] = -np.inf
+        self.transition.data[tag2id[START_TAG], :] = -10000.0
+        self.transition.data[:, tag2id[STOP_TAG]] = -10000.0
 
     def init_hidden(self):
         hidden = (torch.randn(2, 1, self.hidden_dim // 2).to(self.device), \
@@ -44,7 +44,7 @@ class BiLSTM_CRF(nn.Module):
         lstm_feat = lstm_feat.view(len(sentence), self.hidden_dim)
         feats = self.emission(lstm_feat)
         
-        forward_var = torch.full((1, self.target_size), -np.inf).to(self.device)
+        forward_var = torch.full((1, self.target_size), -10000.0).to(self.device)
         forward_var[0][self.tag2id[START_TAG]] = 0.0
         for feat in feats:
             alpha_t = []
@@ -73,7 +73,7 @@ class BiLSTM_CRF(nn.Module):
 
         path_saving = []
 
-        forward_var = torch.full((1, self.target_size), -np.inf).to(self.device)
+        forward_var = torch.full((1, self.target_size), -10000.0).to(self.device)
         forward_var[0][self.tag2id[START_TAG]] = 0.0
         for feat in feats:
             max_score_id_list = []

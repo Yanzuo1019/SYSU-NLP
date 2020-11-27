@@ -19,6 +19,13 @@ HIDDEN_DIM = 200
 EPOCH = 5
 LEARNING_RATE = 0.005
 
+id2tag = ['B', 'M', 'E', 'S']
+tag2id = {'B': 0, 'M': 1, 'E': 2, 'S': 3}
+id2word = []
+word2id = {}
+tag2id[START_TAG]=len(tag2id)
+tag2id[STOP_TAG]=len(tag2id)
+
 def item2tag(item):
     result = []
     if len(item) == 1:
@@ -33,25 +40,84 @@ def item2tag(item):
         result.append(tag2id['E'])
     return result
 
+def test(x_test, y_test):
+    logger.info("Testing...Wait!")
+
+    pred_num = 0
+    gt_num = 0
+    correct_pred_num = 0
+
+    for sentence, tags in zip(x_test, y_test):
+        with torch.no_grad():
+            sentence = torch.LongTensor(sentence).to(device)
+            predict = model.decode(sentence)
+
+        predict_item = []
+        gt_item = []
+
+        temp_item = []
+        for i in range(len(sentence)):
+            if id2tag[predict[i]] == "B":
+                temp_item = [id2word[sentence[i]]]
+            elif id2tag[predict[i]] == "M" and len(temp_item) != 0:
+                temp_item.append(id2word[sentence[i]])
+            elif id2tag[predict[i]] == "E" and len(temp_item) != 0:
+                temp_item.append(id2word[sentence[i]])
+                predict_item.append(temp_item)
+                temp_item = []
+            elif id2tag[predict[i]] == "S":
+                temp_item = [id2word[sentence[i]]]
+                predict_item.append(temp_item)
+                temp_item = []
+            else:
+                temp_item = []
+
+        temp_item = []
+        for i in range(len(sentence)):
+            if id2tag[tags[i]] == "B":
+                temp_item = [id2word[sentence[i]]]
+            elif id2tag[tags[i]] == "M" and len(temp_item) != 0:
+                temp_item.append(id2word[sentence[i]])
+            elif id2tag[tags[i]] == "E" and len(temp_item) != 0:
+                temp_item.append(id2word[sentence[i]])
+                gt_item.append(temp_item)
+                temp_item = []
+            elif id2tag[tags[i]] == "S":
+                temp_item = [id2word[sentence[i]]]
+                gt_item.append(temp_item)
+                temp_item = []
+            else:
+                temp_item = []
+    
+        correct_pred = [i for i in predict_item if i in gt_item]
+        pred_num += len(predict_item)
+        gt_num += len(gt_item)
+        correct_pred_num += len(correct_pred)
+
+    if correct_pred_num > 0:
+        precision = float(correct_pred_num) / float(pred_num)
+        recall = float(correct_pred_num) / float(gt_num)
+        F1 = (2 * precision * recall) / (precision + recall)
+        logger.info("Test Result --- precision = {:.2f}".format(precision))
+        logger.info("Test Result --- recall = {:.2f}".format(recall))
+        logger.info("Test Result --- F1 score = {:.2f}".format(F1))
+    else:
+        logger.info("Test Result --- F1 score = {:.2f}".format(0.0))
+
 if __name__ == "__main__":
     logger = logging.getLogger()
     logging.basicConfig(
         level=logging.DEBUG, 
         datefmt="%Y-%m-%d %H:%M:%S",
-        format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s: %(message)s'
+        format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s: %(message)s',
+        filemode="w",
+        filename="train.log"
     )
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     logger.info("Device: {}".format(str(device)))
 
-    id2tag = ['B', 'M', 'E', 'S']
-    tag2id = {'B': 0, 'M': 1, 'E': 2, 'S': 3}
-    id2word = []
-    word2id = {}
     word_num = 0
-
-    tag2id[START_TAG]=len(tag2id)
-    tag2id[STOP_TAG]=len(tag2id)
 
     x_train = []
     y_train = []
@@ -113,11 +179,14 @@ if __name__ == "__main__":
     optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4)
     logger.info("Model and optimizer initialize successfully")
 
+    test(x_test, y_test)
+
     logger.info("Start training")
     for epoch in range(EPOCH):
         iters = 0
         for sentence, tags in zip(x_train, y_train):
             iters += 1
+            model.zero_grad()
 
             sentence = torch.LongTensor(sentence).to(device)
             tags = torch.LongTensor(tags).to(device)
@@ -128,56 +197,10 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
 
-            if iters % 1000 == 0:
+            if iters % 10000 == 0:
                 logger.info("epoch {}/{} iters {}/{}".format(epoch+1, EPOCH, iters, len(x_train)))
-            
-        logger.info("Start testing")
+                test(x_test, y_test)
+                torch.save(model.state_dict(), "checkpoint/bilstm_crf_epoch_{}_iters_{}.pth".format(epoch+1, iters))
 
-        predict_item = []
-        gt_item = []
-
-        for sentence, tags in zip(x_test, y_test):
-            with torch.no_grad():
-                sentence = torch.LongTensor(sentence).to(device)
-                predict = model.decode(sentence)
-
-            temp_item = []
-            for i in range(len(sentence)):
-                if id2tag[predict[i]] == "B":
-                    temp_item = [id2word[sentence[i]]]
-                elif id2tag[predict[i]] == "M" and len(temp_item) != 0:
-                    temp_item.append(id2word[sentence[i]])
-                elif id2tag[predict[i]] == "E" and len(temp_item) != 0:
-                    temp_item.append(id2word[sentence[i]])
-                    predict_item.append(temp_item)
-                    temp_item = []
-                elif id2tag[predict[i]] == "S":
-                    temp_item = [id2word[sentence[i]]]
-                    predict_item.append(temp_item)
-                    temp_item = []
-                else:
-                    temp_item = []
-
-            temp_item = []
-            for i in range(len(sentence)):
-                if id2tag[tags[i]] == "B":
-                    temp_item = [id2word[sentence[i]]]
-                elif id2tag[tags[i]] == "M" and len(temp_item) != 0:
-                    temp_item.append(id2word[sentence[i]])
-                elif id2tag[tags[i]] == "E" and len(temp_item) != 0:
-                    temp_item.append(id2word[sentence[i]])
-                    gt_item.append(temp_item)
-                    temp_item = []
-                elif id2tag[tags[i]] == "S":
-                    temp_item = [id2word[sentence[i]]]
-                    gt_item.append(temp_item)
-                    temp_item = []
-                else:
-                    temp_item = []
-        
-        correct_pred = [i for i in predict_item if i in gt_item]
-        if len(correct_pred) > 0:
-            precision = len(correct_pred) / len(predict_item)
-            recall = len(correct_pred) / len(gt_item)
-            F1 = (2 * precision * recall) / (precision + recall)
-            logger.info("Test Result --- F1 score = {:.2f}%".format(F1 * 100))
+        test(x_test, y_test)
+        torch.save(model.state_dict(), "checkpoint/bilstm_crf_epoch_{}_iters_{}.pth".format(epoch+1, iters))
