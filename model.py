@@ -15,7 +15,7 @@ def log_sum_exp(score):
     return max_score + torch.log(torch.sum(torch.exp(score - max_score_expand)))
 
 class BiLSTM_CRF(nn.Module):
-    def __init__(self, vocab_size, tag2id, embedding_size, hidden_dim, device):
+    def __init__(self, vocab_size, tag2id, embedding_size, hidden_dim, device, embedding_list):
         super(BiLSTM_CRF, self).__init__()
         self.device = device
         self.vocab_size = vocab_size
@@ -32,10 +32,15 @@ class BiLSTM_CRF(nn.Module):
         self.transition.data[tag2id[START_TAG], :] = -10000.0
         self.transition.data[:, tag2id[STOP_TAG]] = -10000.0
 
+        if embedding_list is not None:
+            self.word_embed.from_pretrained(torch.Tensor(embedding_list))
+            # for para in self.word_embed.parameters():
+            #     para.requires_grad = False
+
     def init_hidden(self):
         hidden = (torch.randn(2, 1, self.hidden_dim // 2).to(self.device), \
             torch.randn(2, 1, self.hidden_dim // 2).to(self.device))
-        return hidden
+        return hidden       
     
     def forward(self, sentence, tags):
         hidden = self.init_hidden()
