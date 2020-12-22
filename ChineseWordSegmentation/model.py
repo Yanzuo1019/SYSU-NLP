@@ -4,7 +4,6 @@
 
 import torch
 import torch.nn as nn
-import numpy as np
 
 START_TAG = "<START>"
 STOP_TAG = "<STOP>"
@@ -40,7 +39,7 @@ class BiLSTM_CRF(nn.Module):
     def init_hidden(self):
         hidden = (torch.randn(2, 1, self.hidden_dim // 2).to(self.device), \
             torch.randn(2, 1, self.hidden_dim // 2).to(self.device))
-        return hidden       
+        return hidden
     
     def forward(self, sentence, tags):
         hidden = self.init_hidden()
