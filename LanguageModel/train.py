@@ -9,7 +9,6 @@ LEARNING_RATE = 1e-3
 EPOCH = 10
 BATCH_SIZE = 32
 
-
 data_path = "data/result.utf8"
 
 word2id = {}
@@ -27,6 +26,7 @@ word_num += 1
 sentences = []
 seq_lens = []
 
+
 class MaskedLSTM(nn.Module):
     def __init__(self, embedding_size, hidden_size, num_layers=1, bias=True, batch_first=False, dropout=0., bidirectional=False):
         super(MaskedLSTM, self).__init__()
@@ -40,6 +40,7 @@ class MaskedLSTM(nn.Module):
         y_lstm, hidden = self.lstm(x_packed)
         y_padded, length = nn.utils.rnn.pad_packed_sequence(y_lstm, batch_first=self.batch_first, total_length=total_length)
         return y_padded, hidden
+
 
 class RNNLM(nn.Module):
     def __init__(self, vocab_size, embedding_size, hidden_size):
@@ -67,6 +68,7 @@ def padding(sentences, max_len):
         index.extend([j for j in range(i * max_len, i * max_len + len(sen))])
     return torch.stack(batch), index
 
+
 if __name__ == "__main__":
     with open(data_path, "r", encoding="utf8") as data:
         for line in data:
@@ -91,8 +93,6 @@ if __name__ == "__main__":
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=1, verbose=True)
 
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    if torch.cuda.device_count() > 1:
-        model = nn.DataParallel(model)
     model = model.cuda()
 
     start = time.time()
