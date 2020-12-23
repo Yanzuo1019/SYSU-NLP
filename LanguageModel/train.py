@@ -91,6 +91,8 @@ if __name__ == "__main__":
                     word_num += 1
                 sen.append(word2id[word])
             
+            if len(sen) <= 0:
+                continue
             # sen.append(word2id["<EOS>"])
             sentences.append(sen)
             seq_lens.append(len(sen))
