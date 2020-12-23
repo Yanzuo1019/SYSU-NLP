@@ -7,7 +7,7 @@ EMBEDDING_SIZE = 128
 HIDDEN_SIZE = 1024
 LEARNING_RATE = 1e-3
 EPOCH = 10
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 
 data_path = "data/result.utf8"
 
