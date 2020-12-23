@@ -60,13 +60,19 @@ class RNNLM(nn.Module):
 def padding(sentences, max_len):
     batch = []
     index = []
+    gt = []
+
     for i, sen in enumerate(sentences):
         tensor = sen.copy()
+        gt.extend(tensor[1:].extend([word2id["<EOS>"]]))
         tensor.extend([word2id["<PAD>"]] * (max_len - len(sen)))
         tensor = torch.LongTensor(tensor)
         batch.append(tensor)
         index.extend([j for j in range(i * max_len, i * max_len + len(sen))])
-    return torch.stack(batch), index
+
+    batch = torch.stack(batch)
+    gt = torch.LongTensor(gt)
+    return batch, index, gt
 
 
 if __name__ == "__main__":
@@ -108,11 +114,11 @@ if __name__ == "__main__":
                 lens = seq_lens[i:]
             
             # lens = torch.LongTensor(lens).to(device)
-            stcs, index = padding(batch, max(lens))
+            stcs, index, gt = padding(batch, max(lens))
             stcs = stcs.to(device)
-            out = model(stcs, lens)
+            gt = gt.to(device)
 
-            gt = torch.cat([stcs.view(-1)[1:], torch.LongTensor([word2id["<EOS>"]])])
+            out = model(stcs, lens)
             loss = criterion(out[index], gt)
             total_loss += loss.item()
 
