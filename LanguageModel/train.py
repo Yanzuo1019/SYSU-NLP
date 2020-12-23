@@ -64,7 +64,8 @@ def padding(sentences, max_len):
 
     for i, sen in enumerate(sentences):
         tensor = sen.copy()
-        tmp = tensor[1:].extend([word2id["<EOS>"]])
+        tmp = tensor[1:]
+        tmp.extend([word2id["<EOS>"]])
         gt.extend(tmp)
 
         tensor.extend([word2id["<PAD>"]] * (max_len - len(sen)))
