@@ -82,7 +82,7 @@ if __name__ == "__main__":
                     word_num += 1
                 sen.append(word2id[word])
             
-            sen.append(word2id["<EOS>"])
+            # sen.append(word2id["<EOS>"])
             sentences.append(sen)
             seq_lens.append(len(sen))
 
@@ -110,9 +110,10 @@ if __name__ == "__main__":
             # lens = torch.LongTensor(lens).to(device)
             stcs, index = padding(batch, max(lens))
             stcs = stcs.to(device)
-
             out = model(stcs, lens)
-            loss = criterion(out[index], stcs.view(-1)[index])
+
+            gt = torch.cat([stcs.view(-1)[1:], torch.LongTensor([word2id["<EOS>"]])])
+            loss = criterion(out[index], gt)
             total_loss += loss.item()
 
             model.zero_grad()
