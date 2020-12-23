@@ -1,13 +1,8 @@
-import time
-
 import torch
 import torch.nn as nn
 
 EMBEDDING_SIZE = 128
 HIDDEN_SIZE = 1024
-LEARNING_RATE = 1e-3
-EPOCH = 10
-BATCH_SIZE = 16
 
 data_path = "data/result.utf8"
 
@@ -26,6 +21,8 @@ word_num += 1
 sentences = []
 seq_lens = []
 
+device = None
+
 
 class MaskedLSTM(nn.Module):
     def __init__(self, embedding_size, hidden_size, num_layers=1, bias=True, batch_first=False, dropout=0., bidirectional=False):
@@ -34,10 +31,13 @@ class MaskedLSTM(nn.Module):
         self.lstm = nn.LSTM(embedding_size, hidden_size, num_layers=num_layers, bias=bias,
              batch_first=batch_first, dropout=dropout, bidirectional=bidirectional)
 
-    def forward(self, input_tensor, seq_lens):
+    def forward(self, input_tensor, seq_lens, hidden=None):
         total_length = input_tensor.size(1) if self.batch_first else input_tensor.size(0)
         x_packed = nn.utils.rnn.pack_padded_sequence(input_tensor, seq_lens, batch_first=self.batch_first, enforce_sorted=False)
-        y_lstm, hidden = self.lstm(x_packed)
+        if hidden is None:
+            y_lstm, hidden = self.lstm(x_packed)
+        else:
+            y_lstm, hidden = self.lstm(x_packed, hidden)
         y_padded, length = nn.utils.rnn.pad_packed_sequence(y_lstm, batch_first=self.batch_first, total_length=total_length)
         return y_padded, hidden
 
@@ -55,6 +55,28 @@ class RNNLM(nn.Module):
         out, _ = self.lstm(embedding, seq_lens)
         out = self.linear(out.view(batch_size * time_step, -1))
         return out
+    
+    def test(self, word):
+        sentence = []
+        sentence.append(word2id[word])
+
+        softmax = nn.Softmax(dim=0)
+
+        tensor = torch.LongTensor([sentence[-1]]).view(1, -1).to(device)
+        embedding = self.word_embed(tensor).view(1, 1, -1)
+        out, hidden = self.lstm(embedding, [1])
+        prob = softmax(out.view(1, -1))
+        
+        while torch.argmax(prob).item() != word2id["<EOS>"]:
+            sentence.append(torch.argmax(prob).item())
+            # print([id2word[i] for i in sentence])
+
+            tensor = torch.LongTensor([sentence[-1]]).view(1, -1).to(device)
+            embedding = self.word_embed(tensor).view(1, 1, -1)
+            out, hidden = self.lstm(embedding, [1], hidden)
+            prob = softmax(out.view(1, -1))
+        
+        return sentence
 
 
 def padding(sentences, max_len):
@@ -85,44 +107,25 @@ if __name__ == "__main__":
             sen.append(word2id["<EOS>"])
             sentences.append(sen)
             seq_lens.append(len(sen))
-
+    
     vocab_size = len(word2id)
     model = RNNLM(vocab_size, EMBEDDING_SIZE, HIDDEN_SIZE)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=1, verbose=True)
+    model.load_state_dict(torch.load("checkpoint/rnnlm_epoch_10.pth"))
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cpu")
     model = model.to(device)
 
-    start = time.time()
-    for epoch in range(EPOCH):
-        total_loss = 0.0
-        count = 0
-        for iters, i in enumerate(range(0, len(sentences), BATCH_SIZE)):
-            if len(sentences) - i > BATCH_SIZE:
-                batch = sentences[i:i+BATCH_SIZE]
-                lens = seq_lens[i:i+BATCH_SIZE]
-            else:
-                batch = sentences[i:]
-                lens = seq_lens[i:]
-            
-            # lens = torch.LongTensor(lens).to(device)
-            stcs, index = padding(batch, max(lens))
-            stcs = stcs.to(device)
-
-            out = model(stcs, lens)
-            loss = criterion(out[index], stcs.view(-1)[index])
-            total_loss += loss.item()
-
-            model.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            count += 1
-
-        average_loss = total_loss / count
-        elapsed_time = int(time.time() - start)
-        print("Epoch {}/{} Average Loss: {:.6f} Elapsed Time: {}m{}s".format(epoch + 1, EPOCH, average_loss, elapsed_time // 60, elapsed_time % 60))
-        scheduler.step(average_loss)
-        torch.save(model.state_dict(), "checkpoint/rnnlm_epoch_{}.pth".format(epoch + 1))
+    while True:
+        word = input("Please input the first word to generate sentence: ")
+        if word not in word2id:
+            print("Sorry, word {} is not in the dictionary!".format(word))
+        else:
+            print("Get id from array word2id: {}".format(word2id[word]))
+        
+        sentence = model.test(word)
+        output_str = ""
+        for i in range(len(sentence)):
+            output_str += id2word[sentence[i]]
+        
+        print(output_str, "\n")
