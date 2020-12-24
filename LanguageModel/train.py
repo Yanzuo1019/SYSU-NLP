@@ -1,4 +1,5 @@
 import time
+import argparse
 
 import torch
 import torch.nn as nn
@@ -79,6 +80,16 @@ def padding(sentences, max_len):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_path", type=str, default=None, 
+        help="pretrain model path")
+    parser.add_argument("--start_epoch", type=int, default=0,
+        help="epoch number inherit from pretrain model")
+    args = parser.parse_args()
+
+    model_path = args.model_path
+    start_epoch = args.start_epoch
+
     with open(data_path, "r", encoding="utf8") as data:
         for line in data:
             line_split = line.strip().split()
@@ -102,6 +113,9 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=1, verbose=True)
+
+    if model_path is not None:
+        model.load_state_dict(torch.load(model_path))
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
@@ -135,6 +149,7 @@ if __name__ == "__main__":
 
         average_loss = total_loss / count
         elapsed_time = int(time.time() - start)
-        print("Epoch {}/{} Average Loss: {:.6f} Elapsed Time: {}m{}s".format(epoch + 1, EPOCH, average_loss, elapsed_time // 60, elapsed_time % 60))
+        print("Epoch {}/{} Average Loss: {:.6f} Elapsed Time: {}m{}s".format(epoch + start_epoch + 1, EPOCH + start_epoch, \
+            average_loss, elapsed_time // 60, elapsed_time % 60))
         scheduler.step(average_loss)
         torch.save(model.state_dict(), "checkpoint/rnnlm_epoch_{}.pth".format(epoch + 1))
