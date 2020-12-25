@@ -7,7 +7,7 @@ import torch.nn as nn
 EMBEDDING_SIZE = 128
 HIDDEN_SIZE = 1024
 LEARNING_RATE = 1e-3
-EPOCH = 10
+EPOCH = 20
 BATCH_SIZE = 16
 
 data_path = "data/result.utf8"
@@ -85,10 +85,13 @@ if __name__ == "__main__":
         help="pretrain model path")
     parser.add_argument("--start_epoch", type=int, default=0,
         help="epoch number inherit from pretrain model")
+    parser.add_argument("--learning_rate", type=float, default=1e-3,
+        help="learning rate of Adam optimizer")
     args = parser.parse_args()
 
     model_path = args.model_path
     start_epoch = args.start_epoch
+    LEARNING_RATE = args.learning_rate
 
     with open(data_path, "r", encoding="utf8") as data:
         for line in data:
@@ -152,4 +155,4 @@ if __name__ == "__main__":
         print("Epoch {}/{} Average Loss: {:.6f} Elapsed Time: {}m{}s".format(epoch + start_epoch + 1, EPOCH + start_epoch, \
             average_loss, elapsed_time // 60, elapsed_time % 60))
         scheduler.step(average_loss)
-        torch.save(model.state_dict(), "checkpoint/rnnlm_epoch_{}.pth".format(epoch + 1))
+        torch.save(model.state_dict(), "checkpoint/rnnlm_epoch_{}.pth".format(epoch + start_epoch + 1))
