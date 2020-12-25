@@ -1,3 +1,5 @@
+import argparse
+
 import torch
 import torch.nn as nn
 
@@ -22,7 +24,6 @@ sentences = []
 seq_lens = []
 
 device = None
-
 
 class MaskedLSTM(nn.Module):
     def __init__(self, embedding_size, hidden_size, num_layers=1, bias=True, batch_first=False, dropout=0., bidirectional=False):
@@ -65,6 +66,7 @@ class RNNLM(nn.Module):
         tensor = torch.LongTensor([sentence[-1]]).view(1, -1).to(device)
         embedding = self.word_embed(tensor).view(1, 1, -1)
         out, hidden = self.lstm(embedding, [1])
+        out = self.linear(out.view(1, -1))
         prob = softmax(out.view(1, -1))
         
         while torch.argmax(prob).item() != word2id["<EOS>"]:
@@ -74,24 +76,18 @@ class RNNLM(nn.Module):
             tensor = torch.LongTensor([sentence[-1]]).view(1, -1).to(device)
             embedding = self.word_embed(tensor).view(1, 1, -1)
             out, hidden = self.lstm(embedding, [1], hidden)
+            out = self.linear(out.view(1, -1))
             prob = softmax(out.view(1, -1))
         
         return sentence
 
 
-def padding(sentences, max_len):
-    batch = []
-    index = []
-    for i, sen in enumerate(sentences):
-        tensor = sen.copy()
-        tensor.extend([word2id["<PAD>"]] * (max_len - len(sen)))
-        tensor = torch.LongTensor(tensor)
-        batch.append(tensor)
-        index.extend([j for j in range(i * max_len, i * max_len + len(sen))])
-    return torch.stack(batch), index
-
-
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_path", type=str, default=None,
+        help="path of pretrained model")
+    args = parser.parse_args()
+
     with open(data_path, "r", encoding="utf8") as data:
         for line in data:
             line_split = line.strip().split()
@@ -110,7 +106,7 @@ if __name__ == "__main__":
     
     vocab_size = len(word2id)
     model = RNNLM(vocab_size, EMBEDDING_SIZE, HIDDEN_SIZE)
-    model.load_state_dict(torch.load("checkpoint/rnnlm_epoch_10.pth"))
+    model.load_state_dict(torch.load(args.model_path))
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     # device = torch.device("cpu")
