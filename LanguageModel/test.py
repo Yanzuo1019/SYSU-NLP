@@ -61,7 +61,7 @@ class RNNLM(nn.Module):
         sentence = []
         sentence.append(word2id[word])
 
-        softmax = nn.Softmax(dim=0)
+        softmax = nn.Softmax(dim=1)
 
         tensor = torch.LongTensor([sentence[-1]]).view(1, -1).to(device)
         embedding = self.word_embed(tensor).view(1, 1, -1)
